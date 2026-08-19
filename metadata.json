@@ -1,0 +1,6 @@
+{
+  "name": "Generator Bedah CP ke TP PAI SD",
+  "description": "Aplikasi analisis dan perumusan Capaian Pembelajaran (CP) menjadi Tujuan Pembelajaran (TP) operasional untuk guru PAI SD berbasis Taksonomi SOLO dan Regulasi Kemendikdasmen / BSKAP.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
