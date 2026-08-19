@@ -1,4 +1,5 @@
 import { ATPItem, BedahMateriItem, ElemenPAI, Fase, HasilBedahCP, Kelas, MasterATPPhase, SoloLevel } from '../types/pai';
+import { OFFICIAL_CP_PAI } from '../data/pai-curriculum';
 
 export const PAI_PPP_OPTIONS = [
   'Beriman, Bertakwa kepada Tuhan YME & Berakhlak Mulia',
@@ -12,6 +13,7 @@ export const PAI_PPP_OPTIONS = [
 /**
  * Standard complete 5-element Master ATP definitions for all 3 SD Phases
  * according to Keputusan BKPDM No. 020/2026 & BSKAP 046/2025.
+ * Strictly isolated per phase to prevent any cross-phase leakage.
  */
 export function getDefaultMasterATP(fase: Fase): MasterATPPhase {
   if (fase === 'Fase A') {
@@ -413,7 +415,7 @@ function generateFaseAMasterATP(): MasterATPPhase {
   };
 }
 
-// ---------------- FASE B (Kelas 3 & Kelas 4) ----------------
+// ---------------- FASE B (Kelas 3 & Kelas 4) - STRICTLY FASE B ----------------
 function generateFaseBMasterATP(): MasterATPPhase {
   const items: ATPItem[] = [
     // === KELAS 3 SEMESTER 1 (54 JP) ===
@@ -793,7 +795,7 @@ function generateFaseBMasterATP(): MasterATPPhase {
     totalJP: items.reduce((acc, curr) => acc + curr.alokasiJP, 0),
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-    rasionalAlur: 'Alur Tujuan Pembelajaran Fase B (Kelas 3 & 4) mematangkan pemahaman kaidah syariat (hukum tajwid, rukhsah salat, zakat) dan mengintegrasikannya dengan penghayatan sosial kemanusiaan (toleransi, menghargai keragaman, ukhuwah islamiyah, kepemimpinan Khulafaur Rasyidin).',
+    rasionalAlur: 'Alur Tujuan Pembelajaran Fase B (Kelas 3 & 4) mematangkan pemahaman kaidah syariat (hukum tajwid nun/mim sukun, rukhsah salat, zakat fitrah) dan mengintegrasikannya dengan penghayatan sosial kemanusiaan (toleransi, menghargai keragaman, ukhuwah islamiyah, kepemimpinan Khulafaur Rasyidin).',
     prinsipDistribusi: [
       'Alokasi merata 54 JP per semester (18 pekan x 3 JP/pekan) = 108 JP per tahun.',
       'Setiap semester mengakomodasi keterwakilan 5 elemen PAI secara seimbang.',
@@ -803,7 +805,7 @@ function generateFaseBMasterATP(): MasterATPPhase {
   };
 }
 
-// ---------------- FASE C (Kelas 5 & Kelas 6) ----------------
+// ---------------- FASE C (Kelas 5 & Kelas 6) - STRICTLY FASE C ----------------
 function generateFaseCMasterATP(): MasterATPPhase {
   const items: ATPItem[] = [
     // === KELAS 5 SEMESTER 1 (54 JP) ===
@@ -1183,7 +1185,7 @@ function generateFaseCMasterATP(): MasterATPPhase {
     totalJP: items.reduce((acc, curr) => acc + curr.alokasiJP, 0),
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-    rasionalAlur: 'Alur Tujuan Pembelajaran Fase C (Kelas 5 & 6) mengantarkan peserta didik menuju kematangan nalar fikih biologis/mukallaf, etika bermedia sosial, kepedulian ekologis, moderasi beragama Wali Songo, serta kesiapan menyongsong jenjang SMP.',
+    rasionalAlur: 'Alur Tujuan Pembelajaran Fase C (Kelas 5 & 6) mengantarkan peserta didik menuju kematangan nalar fikih biologis/mukallaf (balig, puasa, zakat mal, makanan halal), etika bermedia sosial, kepedulian ekologis, moderasi beragama Wali Songo, serta kesiapan menyongsong jenjang SMP.',
     prinsipDistribusi: [
       'Alokasi merata 54 JP per semester (18 pekan x 3 JP/pekan) = 108 JP per tahun.',
       'Memfasilitasi transisi kognitif menuju berpikir formal kritis dan proyek aksi sosial nyata.',
@@ -1194,25 +1196,21 @@ function generateFaseCMasterATP(): MasterATPPhase {
 }
 
 /**
- * Merge and distribute custom TPs from user's Bedah History across the Phase
+ * Merge and distribute custom TPs from user's Bedah History across the Phase.
+ * STRICT ISOLATION: Rejects any item that does not match the target Fase!
+ * If only some elements are in history, it merges them and keeps official standard for remaining elements,
+ * ensuring all 5 elements are complete without any cross-phase contamination.
  */
 export function generateMasterATPFromHistory(fase: Fase, historyList: HasilBedahCP[]): MasterATPPhase {
+  // 1. Get official base template for this exact phase
+  const baseMaster = getDefaultMasterATP(fase);
+  
+  // 2. Filter history items that strictly belong to this phase
   const matchingHistory = historyList.filter(h => h.identitas.fase === fase);
 
-  // If no matching history, return official default
   if (matchingHistory.length === 0) {
-    return getDefaultMasterATP(fase);
+    return baseMaster;
   }
-
-  // Collect all unique TP items from history
-  const allTps: BedahMateriItem[] = [];
-  matchingHistory.forEach(h => {
-    h.tabelBedahMateri.forEach(tp => {
-      if (!allTps.some(existing => existing.tujuanPembelajaran === tp.tujuanPembelajaran)) {
-        allTps.push(tp);
-      }
-    });
-  });
 
   const kelasList: Kelas[] = fase === 'Fase A' 
     ? ['Kelas 1', 'Kelas 2'] 
@@ -1221,62 +1219,98 @@ export function generateMasterATPFromHistory(fase: Fase, historyList: HasilBedah
   const kelas1 = kelasList[0];
   const kelas2 = kelasList[1];
 
-  // Distribute across 4 semesters (Kelas1 Sem1, Kelas1 Sem2, Kelas2 Sem1, Kelas2 Sem2)
-  const quarter = Math.ceil(allTps.length / 4);
-
-  const items: ATPItem[] = allTps.map((tp, idx) => {
-    let assignedKelas: Kelas = kelas1;
-    let assignedSem: 'Semester 1' | 'Semester 2' = 'Semester 1';
-
-    if (idx < quarter) {
-      assignedKelas = kelas1;
-      assignedSem = 'Semester 1';
-    } else if (idx < quarter * 2) {
-      assignedKelas = kelas1;
-      assignedSem = 'Semester 2';
-    } else if (idx < quarter * 3) {
-      assignedKelas = kelas2;
-      assignedSem = 'Semester 1';
-    } else {
-      assignedKelas = kelas2;
-      assignedSem = 'Semester 2';
+  // Group custom TPs by element from user's history
+  const customElementsByType: Partial<Record<ElemenPAI, BedahMateriItem[]>> = {};
+  matchingHistory.forEach(h => {
+    const elem = h.identitas.elemen;
+    if (!customElementsByType[elem]) {
+      customElementsByType[elem] = [];
     }
+    h.tabelBedahMateri.forEach(tp => {
+      if (!customElementsByType[elem]!.some(e => e.tujuanPembelajaran === tp.tujuanPembelajaran)) {
+        customElementsByType[elem]!.push(tp);
+      }
+    });
+  });
 
-    const semNum = assignedSem === 'Semester 1' ? '1' : '2';
-    const kNum = assignedKelas.replace(/\D/g, '');
+  // Map each item in base master: if user has custom TP for that element, replace / integrate cleanly
+  const allElements: ElemenPAI[] = ['Al-Qur\'an Hadis', 'Akidah', 'Akhlak', 'Fikih', 'Sejarah Peradaban Islam'];
+  const mergedItems: ATPItem[] = [];
 
+  allElements.forEach(elem => {
+    const customTps = customElementsByType[elem];
+    const defaultForElem = baseMaster.items.filter(i => i.elemen === elem);
+
+    if (customTps && customTps.length > 0) {
+      // Use user's custom TPs for this element
+      customTps.forEach((tp, idx) => {
+        // Assign to class 1 or 2 based on index
+        const isFirstHalf = idx < Math.ceil(customTps.length / 2);
+        const assignedKelas: Kelas = isFirstHalf ? kelas1 : kelas2;
+        const assignedSem: 'Semester 1' | 'Semester 2' = (idx % 2 === 0) ? 'Semester 1' : 'Semester 2';
+        const kNum = assignedKelas.replace(/\D/g, '');
+        const sNum = assignedSem === 'Semester 1' ? '1' : '2';
+
+        mergedItems.push({
+          id: `atp-merged-${elem}-${idx}-${Date.now()}`,
+          kodeATP: `${kNum}.${sNum}.${(idx + 1)}`,
+          kodeTP: tp.kodeTP || `TP-${(idx + 1)}`,
+          tujuanPembelajaran: tp.tujuanPembelajaran,
+          materi: tp.materi,
+          elemen: elem,
+          kelas: assignedKelas,
+          semester: assignedSem,
+          alokasiJP: tp.alokasiJP || 9,
+          urutan: mergedItems.length + 1,
+          levelSOLO: tp.levelSOLO,
+          profilPelajarPancasila: ['Beriman, Bertakwa kepada Tuhan YME & Berakhlak Mulia', 'Mandiri'],
+          asesmenSaran: `Asesmen autentik formatif dan sumatif untuk ${tp.materi}.`
+        });
+      });
+    } else {
+      // Retain official standard items for this element
+      defaultForElem.forEach(defItem => {
+        mergedItems.push({
+          ...defItem,
+          urutan: mergedItems.length + 1
+        });
+      });
+    }
+  });
+
+  // Re-sort items by Kelas, Semester, and Elemen
+  mergedItems.sort((a, b) => {
+    if (a.kelas !== b.kelas) return a.kelas.localeCompare(b.kelas);
+    if (a.semester !== b.semester) return a.semester.localeCompare(b.semester);
+    return a.urutan - b.urutan;
+  });
+
+  // Re-index urutan and kodeATP cleanly
+  const finalizedItems = mergedItems.map((item, idx) => {
+    const kNum = item.kelas.replace(/\D/g, '');
+    const sNum = item.semester === 'Semester 1' ? '1' : '2';
     return {
-      id: `atp-merged-${idx}-${Date.now()}`,
-      kodeATP: `${kNum}.${semNum}.${(idx % quarter) + 1}`,
-      kodeTP: tp.kodeTP || `TP ${(idx + 1)}`,
-      tujuanPembelajaran: tp.tujuanPembelajaran,
-      materi: tp.materi,
-      elemen: tp.elemen,
-      kelas: assignedKelas,
-      semester: assignedSem,
-      alokasiJP: tp.alokasiJP || (tp.levelSOLO === 'Extended Abstract' || tp.levelSOLO === 'Relational' ? 4 : 3),
+      ...item,
       urutan: idx + 1,
-      levelSOLO: tp.levelSOLO,
-      profilPelajarPancasila: ['Beriman, Bertakwa kepada Tuhan YME & Berakhlak Mulia', 'Mandiri'],
-      asesmenSaran: `Asesmen autentik formatif dan sumatif untuk ${tp.materi}.`
+      kodeATP: `${kNum}.${sNum}.${(idx % 6) + 1}`
     };
   });
 
   return {
-    id: `master-atp-custom-${fase.replace(/\s+/g, '')}-${Date.now()}`,
+    id: `master-atp-${fase.replace(/\s+/g, '')}-${Date.now()}`,
     fase,
     kelasTerkait: kelasList,
-    totalTP: items.length,
-    totalJP: items.reduce((acc, curr) => acc + curr.alokasiJP, 0),
+    totalTP: finalizedItems.length,
+    totalJP: finalizedItems.reduce((acc, curr) => acc + curr.alokasiJP, 0),
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-    rasionalAlur: `Alur Tujuan Pembelajaran ${fase} dirumuskan berdasarkan kompilasi ${allTps.length} TP hasil bedah mandiri oleh Guru PAI yang didistribusikan merata ke dalam 4 semester.`,
+    rasionalAlur: `Alur Tujuan Pembelajaran ${fase} dirumuskan berdasarkan kompilasi 5 elemen PAI terpadu (${matchingHistory.length} berkas hasil bedah mandiri guru + standar kurikulum resmi).`,
     prinsipDistribusi: [
       `Didistribusikan ke ${kelasList.join(' dan ')} mencakup Semester 1 dan Semester 2.`,
-      `Alokasi total ${items.reduce((acc, curr) => acc + curr.alokasiJP, 0)} JP.`,
+      `Alokasi total ${finalizedItems.reduce((acc, curr) => acc + curr.alokasiJP, 0)} JP (~54 JP per semester).`,
       `Guru dapat memindahkan letak TP antarkelas dan antarsemester sesuai kalender pendidikan sekolah.`
     ],
-    items
+    items: finalizedItems
   };
 }
 

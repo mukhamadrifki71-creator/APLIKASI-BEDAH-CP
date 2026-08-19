@@ -1,15 +1,29 @@
 import React, { useState } from 'react';
-import { X, FileText, Download, Printer, Copy, Check, School, User, Calendar } from 'lucide-react';
+import { X, FileText, Download, Printer, Copy, Check, School, Sparkles, Layers, BookOpen } from 'lucide-react';
 import { HasilBedahCP } from '../types/pai';
-import { DEFAULT_METADATA, DocumentMetadata, exportToCSV, exportToWordDoc, formatAsMarkdown } from '../utils/exportHelper';
+import { 
+  DEFAULT_METADATA, 
+  DocumentMetadata, 
+  exportToCSV, 
+  exportToWordDoc, 
+  exportFullPhaseConsolidatedDoc,
+  exportMasterATPToCSV,
+  formatAsMarkdown 
+} from '../utils/exportHelper';
 
 interface ExportModalProps {
   isOpen: boolean;
   onClose: () => void;
   data: HasilBedahCP;
+  historyList?: HasilBedahCP[];
 }
 
-export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, data }) => {
+export const ExportModal: React.FC<ExportModalProps> = ({ 
+  isOpen, 
+  onClose, 
+  data, 
+  historyList = [] 
+}) => {
   const [meta, setMeta] = useState<DocumentMetadata>(DEFAULT_METADATA);
   const [copiedMd, setCopiedMd] = useState(false);
 
@@ -26,9 +40,12 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, data 
     window.print();
   };
 
+  const currentFase = data.identitas.fase;
+  const matchingHistoryCount = historyList.filter(h => h.identitas.fase === currentFase).length;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
-      <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-zinc-200 overflow-hidden my-6">
+      <div className="bg-white rounded-2xl max-w-3xl w-full max-h-[92vh] flex flex-col shadow-2xl border border-zinc-200 overflow-hidden my-4">
         
         {/* Modal Header */}
         <div className="bg-emerald-950 text-white px-6 py-4 flex items-center justify-between">
@@ -37,8 +54,10 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, data 
               <Download className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-bold text-lg leading-tight">Ekspor Dokumen Bedah CP & TP</h3>
-              <p className="text-xs text-emerald-300">Pilih format unduhan resmi untuk administrasi kurikulum</p>
+              <h3 className="font-bold text-lg leading-tight">Ekspor Dokumen Kurikulum PAI SD</h3>
+              <p className="text-xs text-emerald-300">
+                Pilih ekspor Dokumen Gabungan 1 Fase Penuh atau Elemen Tunggal
+              </p>
             </div>
           </div>
           <button
@@ -50,18 +69,18 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, data 
         </div>
 
         {/* Modal Content */}
-        <div className="p-6 overflow-y-auto space-y-5 text-sm">
+        <div className="p-5 sm:p-6 overflow-y-auto space-y-5 text-sm">
           
           {/* Metadata Customization */}
           <div className="bg-zinc-50 border border-zinc-200 rounded-xl p-4 space-y-3">
-            <h4 className="font-bold text-xs uppercase tracking-wider text-zinc-600 flex items-center gap-1.5">
+            <h4 className="font-bold text-xs uppercase tracking-wider text-zinc-700 flex items-center gap-1.5">
               <School className="w-4 h-4 text-emerald-700" />
-              Identitas Dokumen & Tanda Tangan (Kop Laporan)
+              Identitas Sekolah & Tanda Tangan Pengesahan (Kop Dokumen)
             </h4>
             
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
               <div>
-                <label className="block font-medium text-zinc-700 mb-1">Nama Sekolah / Madrasah</label>
+                <label className="block font-medium text-zinc-700 mb-1">Nama Sekolah / Lembaga</label>
                 <input
                   type="text"
                   value={meta.namaSekolah}
@@ -79,7 +98,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, data 
                 />
               </div>
               <div>
-                <label className="block font-medium text-zinc-700 mb-1">Nama Guru Pengampu</label>
+                <label className="block font-medium text-zinc-700 mb-1">Nama Guru PAI Pengampu</label>
                 <input
                   type="text"
                   value={meta.namaGuru}
@@ -117,86 +136,128 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, data 
             </div>
           </div>
 
-          {/* Export Action Buttons */}
+          {/* Export Action Options */}
           <div className="space-y-3">
-            <h4 className="font-bold text-xs uppercase tracking-wider text-zinc-600">Pilih Format Unduhan</h4>
+            <h4 className="font-bold text-xs uppercase tracking-wider text-zinc-700">Pilih Format Unduhan</h4>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {/* Word Export */}
+            {/* Option 1: HIGHLIGHTED RECOMMENDED CONSOLIDATED MASTER DOCUMENT */}
+            <div className="p-4 rounded-xl border-2 border-emerald-500 bg-emerald-50/70 shadow-xs space-y-2">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start gap-3">
+                  <div className="p-2.5 rounded-lg bg-emerald-700 text-white shrink-0">
+                    <Sparkles className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-extrabold text-emerald-950 text-sm sm:text-base">
+                        Dokumen Master 1 Fase Penuh (5 Elemen Terpadu) (.doc)
+                      </span>
+                      <span className="bg-emerald-700 text-white text-[10px] px-2 py-0.5 rounded-full font-bold">
+                        Rekomendasi Utama
+                      </span>
+                    </div>
+                    <p className="text-xs text-emerald-900 mt-1 leading-relaxed">
+                      Menggabungkan seluruh riwayat berkas ({matchingHistoryCount} berkas tersimpan) dan kurikulum resmi menjadi satu dokumen utuh untuk <strong>{currentFase}</strong>: mencakup 5 Elemen (Al-Qur'an Hadis, Akidah, Akhlak, Fikih, Sejarah), seluruh tabel bedah 8 kolom, master TP, serta alur ATP 4 semester lengkap.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-2 flex justify-end">
+                <button
+                  onClick={() => exportFullPhaseConsolidatedDoc(currentFase, historyList, meta)}
+                  className="bg-emerald-800 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2 rounded-lg flex items-center gap-2 shadow-xs transition-all cursor-pointer active:scale-95"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Unduh Master 5 Elemen {currentFase} (.doc)</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+              
+              {/* Option 2: Single Element Word Doc */}
               <button
                 onClick={() => exportToWordDoc(data, meta)}
-                className="p-4 rounded-xl border border-blue-200 bg-blue-50/50 hover:bg-blue-50 hover:border-blue-400 text-left transition-all group flex items-start gap-3 cursor-pointer shadow-2xs"
+                className="p-3.5 rounded-xl border border-blue-200 bg-blue-50/40 hover:bg-blue-50 hover:border-blue-400 text-left transition-all group flex items-start gap-3 cursor-pointer shadow-2xs"
               >
-                <div className="p-2.5 rounded-lg bg-blue-600 text-white shrink-0 group-hover:scale-105 transition-transform">
-                  <FileText className="w-5 h-5" />
+                <div className="p-2 rounded-lg bg-blue-600 text-white shrink-0 group-hover:scale-105 transition-transform">
+                  <FileText className="w-4 h-4" />
                 </div>
                 <div>
-                  <span className="font-bold text-blue-950 block text-sm">Microsoft Word (.doc)</span>
-                  <p className="text-xs text-blue-800 mt-0.5">
-                    Format dokumen resmi lengkap dengan tabel 8 kolom, kop tanda tangan, dan tata letak rapi siap cetak.
+                  <span className="font-bold text-blue-950 block text-xs sm:text-sm">
+                    Dokumen Elemen Ini Saja ({data.identitas.elemen}) (.doc)
+                  </span>
+                  <p className="text-[11px] text-blue-800 mt-0.5">
+                    Hanya berisi rincian analisis elemen {data.identitas.elemen} yang sedang aktif.
                   </p>
                 </div>
               </button>
 
-              {/* Excel / CSV Export */}
+              {/* Option 3: Excel CSV */}
               <button
-                onClick={() => exportToCSV(data)}
-                className="p-4 rounded-xl border border-emerald-200 bg-emerald-50/50 hover:bg-emerald-50 hover:border-emerald-400 text-left transition-all group flex items-start gap-3 cursor-pointer shadow-2xs"
+                onClick={() => exportMasterATPToCSV(currentFase, historyList)}
+                className="p-3.5 rounded-xl border border-teal-200 bg-teal-50/40 hover:bg-teal-50 hover:border-teal-400 text-left transition-all group flex items-start gap-3 cursor-pointer shadow-2xs"
               >
-                <div className="p-2.5 rounded-lg bg-emerald-700 text-white shrink-0 group-hover:scale-105 transition-transform">
-                  <Download className="w-5 h-5" />
+                <div className="p-2 rounded-lg bg-teal-700 text-white shrink-0 group-hover:scale-105 transition-transform">
+                  <Download className="w-4 h-4" />
                 </div>
                 <div>
-                  <span className="font-bold text-emerald-950 block text-sm">Excel / Spreadsheet (.csv)</span>
-                  <p className="text-xs text-emerald-800 mt-0.5">
-                    Data tabular TP dan KKO untuk diimpor ke aplikasi penilaian atau bank soal.
+                  <span className="font-bold text-teal-950 block text-xs sm:text-sm">
+                    Spreadsheet Master ATP ({currentFase}) (.csv)
+                  </span>
+                  <p className="text-[11px] text-teal-800 mt-0.5">
+                    Data tabular lengkap 4 semester untuk diimpor ke Excel, e-Rapor, atau aplikasi sekolah.
                   </p>
                 </div>
               </button>
 
-              {/* Print / PDF View */}
+              {/* Option 4: Print PDF */}
               <button
                 onClick={handlePrint}
-                className="p-4 rounded-xl border border-purple-200 bg-purple-50/50 hover:bg-purple-50 hover:border-purple-400 text-left transition-all group flex items-start gap-3 cursor-pointer shadow-2xs"
+                className="p-3.5 rounded-xl border border-purple-200 bg-purple-50/40 hover:bg-purple-50 hover:border-purple-400 text-left transition-all group flex items-start gap-3 cursor-pointer shadow-2xs"
               >
-                <div className="p-2.5 rounded-lg bg-purple-700 text-white shrink-0 group-hover:scale-105 transition-transform">
-                  <Printer className="w-5 h-5" />
+                <div className="p-2 rounded-lg bg-purple-700 text-white shrink-0 group-hover:scale-105 transition-transform">
+                  <Printer className="w-4 h-4" />
                 </div>
                 <div>
-                  <span className="font-bold text-purple-950 block text-sm">Cetak / Simpan PDF</span>
-                  <p className="text-xs text-purple-800 mt-0.5">
-                    Buka dialog cetak peramban untuk mencetak langsung ke kertas A4 atau simpan sebagai PDF.
+                  <span className="font-bold text-purple-950 block text-xs sm:text-sm">
+                    Cetak / Simpan PDF
+                  </span>
+                  <p className="text-[11px] text-purple-800 mt-0.5">
+                    Buka dialog cetak peramban untuk cetak kertas A4 atau simpan sebagai PDF.
                   </p>
                 </div>
               </button>
 
-              {/* Copy Markdown */}
+              {/* Option 5: Copy Markdown */}
               <button
                 onClick={handleCopyMarkdown}
-                className="p-4 rounded-xl border border-zinc-200 bg-zinc-50 hover:bg-zinc-100 hover:border-zinc-400 text-left transition-all group flex items-start gap-3 cursor-pointer shadow-2xs"
+                className="p-3.5 rounded-xl border border-zinc-200 bg-zinc-50 hover:bg-zinc-100 hover:border-zinc-400 text-left transition-all group flex items-start gap-3 cursor-pointer shadow-2xs"
               >
-                <div className="p-2.5 rounded-lg bg-zinc-700 text-white shrink-0 group-hover:scale-105 transition-transform">
-                  {copiedMd ? <Check className="w-5 h-5 text-emerald-300" /> : <Copy className="w-5 h-5" />}
+                <div className="p-2 rounded-lg bg-zinc-700 text-white shrink-0 group-hover:scale-105 transition-transform">
+                  {copiedMd ? <Check className="w-4 h-4 text-emerald-300" /> : <Copy className="w-4 h-4" />}
                 </div>
                 <div>
-                  <span className="font-bold text-zinc-950 block text-sm">
-                    {copiedMd ? 'Tersalin ke Clipboard!' : 'Salin Teks Markdown'}
+                  <span className="font-bold text-zinc-950 block text-xs sm:text-sm">
+                    {copiedMd ? 'Tersalin ke Clipboard!' : 'Salin Teks Ringkasan'}
                   </span>
-                  <p className="text-xs text-zinc-600 mt-0.5">
-                    Salin seluruh analisis dalam format teks Markdown untuk ditempel di LMS, Word, atau Google Docs.
+                  <p className="text-[11px] text-zinc-600 mt-0.5">
+                    Salin teks analisis untuk ditempelkan di Google Docs, Word, atau LMS.
                   </p>
                 </div>
               </button>
+
             </div>
           </div>
 
         </div>
 
         {/* Modal Footer */}
-        <div className="bg-zinc-50 px-6 py-3.5 border-t border-zinc-200 flex justify-end">
+        <div className="bg-zinc-50 px-6 py-3 border-t border-zinc-200 flex justify-end">
           <button
             onClick={onClose}
-            className="bg-zinc-700 hover:bg-zinc-800 text-white text-xs font-semibold px-5 py-2 rounded-lg transition-colors cursor-pointer"
+            className="bg-zinc-700 hover:bg-zinc-800 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors cursor-pointer"
           >
             Tutup
           </button>

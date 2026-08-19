@@ -278,6 +278,7 @@ export default function App() {
           isOpen={isExportOpen}
           onClose={() => setIsExportOpen(false)}
           data={resultData}
+          historyList={historyList}
         />
       )}
 

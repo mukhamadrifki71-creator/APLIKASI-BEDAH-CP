@@ -1,10 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { ATPItem, Fase, HasilBedahCP, Kelas, MasterATPPhase, SoloLevel } from '../types/pai';
-import { exportMasterATPToWord, getDefaultMasterATP, generateMasterATPFromHistory, PAI_PPP_OPTIONS } from '../services/atpEngine';
 import { 
-  Calendar, Layers, Download, Check, Copy, ArrowUpDown, ArrowRight, 
-  Sparkles, RefreshCw, Filter, Clock, ChevronDown, ChevronUp, Plus, Trash2, 
-  HelpCircle, BookOpen, MoveHorizontal, CheckCircle2
+  exportMasterATPToWord, 
+  getDefaultMasterATP, 
+  generateMasterATPFromHistory, 
+  PAI_PPP_OPTIONS 
+} from '../services/atpEngine';
+import { 
+  exportFullPhaseConsolidatedDoc, 
+  exportMasterATPToCSV, 
+  DEFAULT_METADATA 
+} from '../utils/exportHelper';
+import { 
+  Calendar, Layers, Download, Check, Copy, ArrowRight, 
+  Sparkles, RefreshCw, MoveHorizontal, CheckCircle2, 
+  FileSpreadsheet, FileText, ChevronDown, ChevronUp, AlertCircle
 } from 'lucide-react';
 import { SOLO_TAXONOMY_GUIDE } from '../data/pai-curriculum';
 
@@ -25,29 +35,43 @@ export const MasterATPBuilder: React.FC<MasterATPBuilderProps> = ({
   const [activeKelasTab, setActiveKelasTab] = useState<Kelas>(masterATP.kelasTerkait[0]);
   const [filterSemester, setFilterSemester] = useState<'all' | 'Semester 1' | 'Semester 2'>('all');
   const [filterElemen, setFilterElemen] = useState<string>('all');
-  const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [copiedNotification, setCopiedNotification] = useState(false);
+  const [feedbackMsg, setFeedbackMsg] = useState<{ type: 'success' | 'info'; text: string } | null>(null);
 
   // Sync when selectedFase changes
   useEffect(() => {
     const defaultData = getDefaultMasterATP(selectedFase);
     setMasterATP(defaultData);
     setActiveKelasTab(defaultData.kelasTerkait[0]);
+    setFeedbackMsg(null);
   }, [selectedFase]);
+
+  const showNotification = (text: string, type: 'success' | 'info' = 'success') => {
+    setFeedbackMsg({ type, text });
+    setTimeout(() => setFeedbackMsg(null), 4000);
+  };
 
   const handleLoadOfficialDefault = () => {
     const data = getDefaultMasterATP(selectedFase);
     setMasterATP(data);
     setActiveKelasTab(data.kelasTerkait[0]);
+    showNotification(`Berhasil memuat Master Standar 2026 (${data.items.length} TP murni ${selectedFase} tanpa percampuran fase lain).`);
   };
 
   const handleMergeFromUserHistory = () => {
+    const matchingCount = historyList.filter(h => h.identitas.fase === selectedFase).length;
     const merged = generateMasterATPFromHistory(selectedFase, historyList);
     setMasterATP(merged);
     setActiveKelasTab(merged.kelasTerkait[0]);
+    
+    if (matchingCount > 0) {
+      showNotification(`Berhasil menggabungkan ${matchingCount} berkas riwayat bedah CP untuk ${selectedFase} ke dalam alur 4 semester.`);
+    } else {
+      showNotification(`Belum ada riwayat khusus untuk ${selectedFase}. Sistem otomatis memadukan standar resmi 5 elemen ${selectedFase}.`, 'info');
+    }
   };
 
-  // Move TP to another Kelas or Semester
+  // Move TP to another Semester
   const handleReassignItem = (itemId: string, newKelas: Kelas, newSemester: 'Semester 1' | 'Semester 2') => {
     const updatedItems = masterATP.items.map(item => {
       if (item.id === itemId) {
@@ -88,7 +112,6 @@ export const MasterATPBuilder: React.FC<MasterATPBuilderProps> = ({
     newItems[index] = newItems[targetIdx];
     newItems[targetIdx] = temp;
 
-    // Refresh sequence numbers
     const reindexed = newItems.map((item, idx) => ({
       ...item,
       urutan: idx + 1
@@ -133,36 +156,59 @@ export const MasterATPBuilder: React.FC<MasterATPBuilderProps> = ({
                 Distribusi Fase Penuh (Master ATP)
               </span>
               <span className="text-xs text-emerald-200">
-                Penyelarasan Seluruh Elemen PAI di Tiap Kelas & Tiap Semester
+                Penyelarasan 5 Elemen Penuh & Terisolasi Murni {selectedFase}
               </span>
             </div>
             <h2 className="text-xl sm:text-2xl font-extrabold text-white mt-1">
               Master Alur Tujuan Pembelajaran (ATP) {selectedFase}
             </h2>
             <p className="text-xs sm:text-sm text-emerald-200 mt-0.5 max-w-3xl">
-              Mendistribusikan seluruh TP dari 5 Elemen PAI secara seimbang ke dalam 2 kelas ({masterATP.kelasTerkait.join(' dan ')}) dan 4 semester (target standar 54 JP/semester, total 108 JP/tahun).
+              Didistribusikan secara berjenjang ke dalam {masterATP.kelasTerkait.join(' dan ')} (4 semester) dengan beban standar 54 JP/semester (total 108 JP/tahun).
             </p>
           </div>
 
           <div className="flex items-center gap-2.5 flex-wrap shrink-0">
+            {/* Master Consolidated 5 Elements Word Export */}
+            <button
+              onClick={() => exportFullPhaseConsolidatedDoc(selectedFase, historyList, DEFAULT_METADATA)}
+              className="bg-emerald-500 hover:bg-emerald-400 text-emerald-950 text-xs sm:text-sm font-extrabold px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-sm transition-all cursor-pointer active:scale-95"
+              title="Ekspor Dokumen Master 1 Fase Penuh (5 Elemen Terpadu)"
+            >
+              <FileText className="w-4 h-4" />
+              <span>Ekspor Master 5 Elemen (.doc)</span>
+            </button>
+
+            {/* Matrix ATP Word Export */}
             <button
               onClick={() => exportMasterATPToWord(masterATP)}
-              className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs sm:text-sm font-bold px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-sm transition-all cursor-pointer active:scale-95"
+              className="bg-emerald-800/90 hover:bg-emerald-700 text-white text-xs sm:text-sm font-semibold px-3.5 py-2.5 rounded-xl border border-emerald-600 flex items-center gap-2 transition-all cursor-pointer"
             >
               <Download className="w-4 h-4" />
-              <span>Ekspor Master ATP (.doc)</span>
+              <span>Ekspor ATP (.doc)</span>
             </button>
+
+            {/* Excel CSV */}
+            <button
+              onClick={() => exportMasterATPToCSV(selectedFase, historyList)}
+              className="bg-emerald-900/80 hover:bg-emerald-800 text-emerald-200 hover:text-white text-xs sm:text-sm font-semibold px-3 py-2.5 rounded-xl border border-emerald-700 flex items-center gap-1.5 transition-all cursor-pointer"
+              title="Ekspor Spreadsheet (.csv)"
+            >
+              <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
+              <span>Excel</span>
+            </button>
+
+            {/* Copy Text */}
             <button
               onClick={handleCopySummary}
-              className="bg-emerald-900/80 hover:bg-emerald-800 text-emerald-200 hover:text-white text-xs sm:text-sm font-semibold px-3.5 py-2.5 rounded-xl border border-emerald-700 flex items-center gap-1.5 transition-all cursor-pointer"
+              className="bg-emerald-900/80 hover:bg-emerald-800 text-emerald-200 hover:text-white text-xs sm:text-sm font-semibold px-3 py-2.5 rounded-xl border border-emerald-700 flex items-center gap-1.5 transition-all cursor-pointer"
             >
               {copiedNotification ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
-              <span>{copiedNotification ? 'Tersalin!' : 'Salin Teks'}</span>
+              <span>{copiedNotification ? 'Tersalin' : 'Salin'}</span>
             </button>
           </div>
         </div>
 
-        {/* Phase Selector & Source Switcher */}
+        {/* Phase Selector & Source Actions */}
         <div className="mt-5 pt-4 border-t border-emerald-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
           
           <div className="flex items-center gap-2 flex-wrap">
@@ -171,7 +217,7 @@ export const MasterATPBuilder: React.FC<MasterATPBuilderProps> = ({
               <button
                 key={f}
                 onClick={() => setSelectedFase(f)}
-                className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
+                className={`px-3.5 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
                   selectedFase === f
                     ? 'bg-white text-emerald-950 shadow-xs'
                     : 'bg-emerald-900/70 text-emerald-200 hover:bg-emerald-800'
@@ -185,25 +231,39 @@ export const MasterATPBuilder: React.FC<MasterATPBuilderProps> = ({
           <div className="flex items-center gap-2 flex-wrap">
             <button
               onClick={handleLoadOfficialDefault}
-              className="bg-emerald-800/90 hover:bg-emerald-700 text-emerald-100 px-3 py-1.5 rounded-lg border border-emerald-600 transition-colors flex items-center gap-1 cursor-pointer font-medium"
+              className="bg-emerald-900 hover:bg-emerald-800 text-emerald-100 px-3 py-1.5 rounded-lg border border-emerald-700 transition-colors flex items-center gap-1 cursor-pointer font-medium"
             >
               <RefreshCw className="w-3.5 h-3.5" />
-              <span>Muat Master Standar (24 TP)</span>
+              <span>Standar Resmi (24 TP {selectedFase})</span>
             </button>
 
-            {matchingHistoryCount > 0 && (
-              <button
-                onClick={handleMergeFromUserHistory}
-                className="bg-amber-600/90 hover:bg-amber-500 text-white px-3 py-1.5 rounded-lg font-semibold transition-colors flex items-center gap-1 cursor-pointer shadow-2xs"
-              >
-                <Sparkles className="w-3.5 h-3.5 text-amber-200" />
-                <span>Gabungkan dari Riwayat ({matchingHistoryCount} Berkas)</span>
-              </button>
-            )}
+            <button
+              onClick={handleMergeFromUserHistory}
+              className="bg-amber-600 hover:bg-amber-500 text-white px-3.5 py-1.5 rounded-lg font-bold transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-200" />
+              <span>Gabungkan dari Riwayat ({matchingHistoryCount} Berkas)</span>
+            </button>
           </div>
 
         </div>
       </div>
+
+      {/* Dynamic Feedback Notification */}
+      {feedbackMsg && (
+        <div className={`p-3.5 rounded-xl border flex items-center gap-2.5 text-xs sm:text-sm font-medium animate-in fade-in duration-200 ${
+          feedbackMsg.type === 'success' 
+            ? 'bg-emerald-50 border-emerald-300 text-emerald-900' 
+            : 'bg-blue-50 border-blue-300 text-blue-900'
+        }`}>
+          {feedbackMsg.type === 'success' ? (
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+          ) : (
+            <AlertCircle className="w-4 h-4 text-blue-600 shrink-0" />
+          )}
+          <span>{feedbackMsg.text}</span>
+        </div>
+      )}
 
       {/* Semester Balance Metric Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -231,7 +291,7 @@ export const MasterATPBuilder: React.FC<MasterATPBuilderProps> = ({
                     </span>
                   </div>
                   <div className="mt-1.5 flex items-center justify-between text-xs text-zinc-500">
-                    <span>{stats.count} Tujuan Pembelajaran</span>
+                    <span>{stats.count} TP</span>
                     <span className="text-[10px] text-zinc-400">Target: ~54 JP</span>
                   </div>
                 </div>
@@ -264,7 +324,7 @@ export const MasterATPBuilder: React.FC<MasterATPBuilderProps> = ({
             ))}
           </div>
 
-          {/* View Mode & Filters */}
+          {/* View Mode */}
           <div className="flex items-center gap-2">
             <div className="flex bg-zinc-200/80 p-0.5 rounded-lg text-xs">
               <button
@@ -316,7 +376,7 @@ export const MasterATPBuilder: React.FC<MasterATPBuilderProps> = ({
                 <div className="space-y-3 min-h-[300px]">
                   {masterATP.items
                     .filter(item => item.kelas === activeKelasTab && item.semester === 'Semester 1')
-                    .map((item, idx) => (
+                    .map((item) => (
                       <div
                         key={item.id}
                         className="bg-white border border-zinc-200 hover:border-emerald-400 rounded-xl p-4 shadow-2xs hover:shadow-xs transition-all space-y-2.5"
@@ -388,7 +448,7 @@ export const MasterATPBuilder: React.FC<MasterATPBuilderProps> = ({
                 <div className="space-y-3 min-h-[300px]">
                   {masterATP.items
                     .filter(item => item.kelas === activeKelasTab && item.semester === 'Semester 2')
-                    .map((item, idx) => (
+                    .map((item) => (
                       <div
                         key={item.id}
                         className="bg-white border border-zinc-200 hover:border-emerald-400 rounded-xl p-4 shadow-2xs hover:shadow-xs transition-all space-y-2.5"
